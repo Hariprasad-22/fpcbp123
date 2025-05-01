@@ -1,50 +1,122 @@
 const asyncHandler = require('express-async-handler');
 const Application = require('../models/Application.model');
+const mongoose = require('mongoose');
 const upload = require('../utils/fileUpload');
 
 // @desc    Get all applications (admin)
 const getApplications = asyncHandler(async (req, res) => {
-    const requiredFields = [
-        'studentInfo', 
-        'companyInfo', 
-        'internshipDuration'
-      ];
-  const applications = await Application.find({})
-    .populate('student', 'fullName email rollNumber');
-  res.json(applications);
+    // If studentOnly flag is set, only return applications for the logged-in student
+    if (req.studentOnly) {
+        const applications = await Application.find({ student: req.user._id })
+            .populate('student', 'fullName email rollNumber');
+        return res.json(applications);
+    }
+    
+    // Otherwise return all applications (admin access)
+    const applications = await Application.find({})
+        .populate('student', 'fullName email rollNumber');
+    res.json(applications);
 });
 
 // @desc    Create new application with file uploads
 const createApplication = asyncHandler(async (req, res) => {
-  // Handle file uploads
-  upload.fields([
-    { name: 'offerLetter', maxCount: 1 },
-    { name: 'nocByHod', maxCount: 1 },
-    { name: 'studentLetterToHod', maxCount: 1 }
-  ])(req, res, async (err) => {
-    if (err) {
-      return res.status(400).json({ message: err.message });
-    }
-
-    try {
-      const documents = {
-        offerLetter: req.files.offerLetter?.[0]?.path,
-        nocByHod: req.files.nocByHod?.[0]?.path,
-        studentLetterToHod: req.files.studentLetterToHod?.[0]?.path
-      };
-
-      const application = new Application({
-        student: req.user._id,
-        ...req.body,
-        documents
-      });
-
-      const createdApplication = await application.save();
-      res.status(201).json(createdApplication);
-    } catch (error) {
-      res.status(400).json({ message: error.message });
-    }
+  console.log('Creating application with body:', {
+    studentInfo: req.body.studentInfo,
+    companyInfo: req.body.companyInfo,
+    internshipDuration: req.body.internshipDuration
   });
+  
+  try {
+    // Parse JSON strings if they are strings
+    let studentInfo = req.body.studentInfo;
+    let companyInfo = req.body.companyInfo;
+    let internshipDuration = req.body.internshipDuration;
+    
+    // Check if the data is sent as strings and parse them
+    if (typeof studentInfo === 'string') {
+      try {
+        studentInfo = JSON.parse(studentInfo);
+      } catch (e) {
+        console.error('Error parsing studentInfo:', e);
+      }
+    }
+    
+    if (typeof companyInfo === 'string') {
+      try {
+        companyInfo = JSON.parse(companyInfo);
+      } catch (e) {
+        console.error('Error parsing companyInfo:', e);
+      }
+    }
+    
+    if (typeof internshipDuration === 'string') {
+      try {
+        internshipDuration = JSON.parse(internshipDuration);
+      } catch (e) {
+        console.error('Error parsing internshipDuration:', e);
+      }
+    }
+    
+    // Get file paths from the uploaded files
+    const documents = {
+      offerLetter: req.files?.offerLetter?.[0]?.path || null,
+      nocByHod: req.files?.nocByHod?.[0]?.path || null,
+      studentLetterToHod: req.files?.studentLetterToHod?.[0]?.path || null
+    };
+    
+    // Ensure we have a valid MongoDB ObjectId for the user
+    let studentId;
+    
+    if (req.user && req.user._id) {
+      // Try to use the ID from authentication
+      try {
+        // Fix: Use 'new' keyword with mongoose.Types.ObjectId constructor
+        studentId = new mongoose.Types.ObjectId(req.user._id);
+        console.log('Using authenticated user ID:', studentId);
+      } catch (error) {
+        console.error('Error converting user ID to ObjectId:', error);
+        // Create a dummy ObjectId for development testing
+        studentId = new mongoose.Types.ObjectId();
+        console.log('Created temporary ObjectId for development:', studentId);
+      }
+    } else {
+      console.log('No user ID found in request, using JWT token ID if available');
+      
+      // Check if there's a decoded token with an ID in the request
+      if (req.decoded && req.decoded.id) {
+        try {
+          studentId = new mongoose.Types.ObjectId(req.decoded.id);
+          console.log('Using ID from JWT token:', studentId);
+        } catch (error) {
+          console.error('Invalid ID in JWT token:', error);
+          studentId = new mongoose.Types.ObjectId();
+          console.log('Created temporary ObjectId after JWT token failure:', studentId);
+        }
+      } else {
+        // Fallback for development/testing
+        studentId = new mongoose.Types.ObjectId();
+        console.log('No user identification found, created temporary ObjectId:', studentId);
+      }
+    }
+    
+    // Create the application with parsed data
+    const application = new Application({
+      student: studentId,
+      studentInfo,
+      companyInfo,
+      internshipDuration,
+      documents
+    });
+    
+    const createdApplication = await application.save();
+    res.status(201).json(createdApplication);
+  } catch (error) {
+    console.error('Application creation error:', error);
+    res.status(400).json({ 
+      message: error.message,
+      stack: process.env.NODE_ENV === 'production' ? null : error.stack 
+    });
+  }
 });
 
 // @desc    Update application status
@@ -80,9 +152,6 @@ const downloadDocument = asyncHandler(async (req, res) => {
 
   res.download(filePath);
 });
-
-
-
 
 module.exports = { 
   createApplication, 

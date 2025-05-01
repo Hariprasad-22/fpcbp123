@@ -1,56 +1,87 @@
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { UserRole } from "@/types";
 
-import React, { createContext, useState, useEffect, useContext } from "react";
-import { User,AuthUser } from "../types";
-import { authenticate } from "../data/mockData";
+interface User {
+  id: string;
+  fullName: string;
+  email: string;
+  role: UserRole;
+}
 
 interface AuthContextType {
   user: User | null;
-  token:string | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string, role: UserRole) => Promise<boolean>;
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  token:null,
-  loading: true,
-  login: () => Promise.resolve(false),
-  logout: () => {},
-});
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [authState, setAuthState] = useState<{
-    user: User | null;
-    token: string | null;
-  }>({ user: null, token: null });
-  const [loading, setLoading] = useState<boolean>(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem("user");
-    const savedToken = localStorage.getItem("token");
+    // Check for existing user session on app load
+    const storedUser = localStorage.getItem("user");
+    const token = localStorage.getItem("authToken");
     
-    if (savedUser && savedToken) {
-      setAuthState({
-        user: JSON.parse(savedUser),
-        token: savedToken
-      });
+    if (storedUser && token) {
+      setUser(JSON.parse(storedUser));
     }
+    
     setLoading(false);
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string, role: UserRole): Promise<boolean> => {
     try {
-      const authData = authenticate(email, password);
-      if (authData) {
-        const { token, ...userData } = authData as AuthUser;
-      setAuthState({ user: userData, token });
-      localStorage.setItem("user", JSON.stringify(userData));
-      localStorage.setItem("token", token);
-      return true;
+      // Mock login for now - in a real app this would call your API
+      const mockUsers = {
+        student: {
+          id: "student1",
+          fullName: "John Student",
+          email: "student@college.edu",
+          role: "student" as UserRole,
+          password: "password123"
+        },
+        admin: {
+          id: "admin1",
+          fullName: "Admin User",
+          email: "admin@college.edu",
+          role: "admin" as UserRole,
+          password: "admin123"
+        }
+      };
+
+      const mockUser = role === "admin" ? mockUsers.admin : mockUsers.student;
+      
+      if (email === mockUser.email && password === mockUser.password) {
+        // Create a token (this would normally come from your backend)
+        const token = `Bearer mock-jwt-token-${Date.now()}`;
+        
+        // Save user info and token to localStorage
+        const userToStore = {
+          id: mockUser.id,
+          fullName: mockUser.fullName,
+          email: mockUser.email,
+          role: mockUser.role
+        };
+        
+        localStorage.setItem("user", JSON.stringify(userToStore));
+        localStorage.setItem("authToken", token);
+        
+        setUser(userToStore);
+        return true;
       }
+      
       return false;
     } catch (error) {
       console.error("Login error:", error);
@@ -59,19 +90,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
-    setAuthState({ user: null, token: null });
     localStorage.removeItem("user");
-    localStorage.removeItem("token");
+    localStorage.removeItem("authToken");
+    setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{
-      user: authState.user,
-      token: authState.token,
-      loading,
-      login,
-      logout
-    }}>
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

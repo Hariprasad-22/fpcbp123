@@ -16,12 +16,16 @@ console.log('Connection String:', process.env.MONGO_URI);
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB Connected'))
   .catch(err => console.log('Connection Error:', err));
+
+// Update CORS configuration to allow requests from the client
 app.use(cors({
-  origin: 'http://localhost:8080',
-  methods:['POST','GET','PUT','DELETE'],
-  allowedHeaders:['Content-Type','Authorization'],
-  credentials :true
+  origin: 'http://localhost:8080', // Your client's origin
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  exposedHeaders: ['Authorization']
 }));
+
 // Middleware
 app.use(express.json());
 // Routes

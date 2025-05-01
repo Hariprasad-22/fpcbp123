@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -39,6 +38,65 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
+// Create properly structured JWT token for testing without backend validation
+const generateToken = (userId: string, role: UserRole) => {
+  // This creates a valid JWT structure (header.payload.signature)
+  const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const payload = btoa(
+    JSON.stringify({
+      id: userId,
+      email: role === "admin" ? "admin@college.edu" : "student@college.edu",
+      role,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60, // 7 days expiry
+    })
+  );
+  const signature = btoa("mock-signature"); // We don't need real signature for test environment
+
+  return `${header}.${payload}.${signature}`;
+};
+
+// Direct login function with hard-coded users for development
+const directLogin = (email: string, password: string, role: UserRole) => {
+  // Specific users with their credentials and details
+  const users = {
+    admin: {
+      id: "admin123",
+      email: "admin@college.edu",
+      password: "password123",
+      role: "admin" as UserRole,
+      name: "Admin User",
+      department: "Computer Science",
+      position: "Department Head"
+    },
+    student: {
+      id: "student456",
+      email: "student@college.edu",
+      password: "password123",
+      role: "student" as UserRole,
+      name: "John Student",
+      rollNumber: "CS21001",
+      course: "B.Tech",
+      year: "3"
+    }
+  };
+  
+  const targetUser = role === "admin" ? users.admin : users.student;
+  
+  if (email === targetUser.email && password === targetUser.password) {
+    const token = generateToken(targetUser.id, targetUser.role);
+    
+    // Return complete user object for storage
+    return {
+      success: true,
+      token,
+      user: targetUser
+    };
+  }
+  
+  return { success: false };
+};
+
 const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -61,21 +119,26 @@ const Login = () => {
 
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
+
     try {
-      const success = await login(data.email, data.password);
-      if (success) {
-        const isAdmin = data.email === "admin@college.edu";
-        if ((role === "admin" && !isAdmin) || (role === "student" && isAdmin)) {
-          toast.error("Invalid credentials for selected role");
-          setIsLoading(false);
-          return;
-        }
+      // Direct login without API call
+      const response = directLogin(data.email, data.password, role as UserRole);
+
+      if (response.success) {
+        // Store the token in localStorage with Bearer prefix
+        localStorage.setItem("authToken", `Bearer ${response.token}`);
+        localStorage.setItem("user", JSON.stringify(response.user));
+
+        // Update auth context state
+        await login(data.email, data.password, role);
+
         toast.success("Login successful");
-        navigate(isAdmin ? "/admin" : "/dashboard");
+        navigate(role === "admin" ? "/admin" : "/dashboard");
       } else {
         toast.error("Invalid credentials");
       }
     } catch (error) {
+      console.error("Login error:", error);
       toast.error("An error occurred during login");
     } finally {
       setIsLoading(false);

@@ -8,34 +8,34 @@ const applicationSchema = new mongoose.Schema({
     default: 'pending' 
   },
   studentInfo: {
-    fullName: String,
-    rollNumber: String,
-    course: String,
-    branch: String,
-    year: Number,
-    semester: Number,
-    email: String,
-    mobileNumber: String,
-    academicYear: String
+    fullName: { type: String, required: true },
+    rollNumber: { type: String, required: true },
+    course: { type: String, required: true },
+    branch: { type: String, required: true },
+    year: { type: String, required: true },
+    semester: { type: String, required: true },
+    email: { type: String, required: true },
+    mobileNumber: { type: String, required: true },
+    academicYear: { type: String, required: true }
   },
   companyInfo: {
-    companyName: String,
-    roleOffered: String,
-    stipend: Number,
-    duration: Number,
-    internshipYear: String,
-    hrName: String,
-    hrMobile: String,
-    hrEmail: String
+    companyName: { type: String, required: true },
+    roleOffered: { type: String, required: true },
+    stipend: { type: String, required: true },
+    duration: { type: String, required: true },
+    internshipYear: { type: String },
+    hrName: { type: String, required: true },
+    hrMobile: { type: String, required: true },
+    hrEmail: { type: String, required: true }
   },
   internshipDuration: {
-    startDate: Date,
-    endDate: Date
+    startDate: { type: Date, required: true },
+    endDate: { type: Date, required: true }
   },
   documents: {
-    offerLetter: String,
-    nocByHod: String,
-    studentLetterToHod: String
+    offerLetter: { type: String },
+    nocByHod: { type: String },
+    studentLetterToHod: { type: String }
   }
 }, { timestamps: true });
 
